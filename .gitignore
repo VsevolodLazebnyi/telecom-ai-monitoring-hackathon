@@ -2,12 +2,16 @@
 __pycache__/
 *.py[codz]
 *$py.class
-
+.vscode
+.DS_Store
 # C extensions
 *.so
 
 # Distribution / packaging
 .Python
+mongodb/
+har_and_cookies/
+generated_images/
 build/
 develop-eggs/
 dist/
