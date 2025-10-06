@@ -37,8 +37,14 @@
 
 - Ниже представлена демонстрация работы анализа логов и создания дашбордов:
 
-<img src="docs/demo.mp4
-" alt="Демонстрация работы AI dashboards and logs monitoring" />
+
+[![Watch the video](https://raw.githubusercontent.com/VsevolodLazebnyi/telecom-ai-monitoring-hackathon/main/docs/view0.png)](https://raw.githubusercontent.com/VsevolodLazebnyi/telecom-ai-monitoring-hackathon/main/docs/docs_(1).mp4)
+- **Запуск:**
+[![Watch the video](https://raw.githubusercontent.com/VsevolodLazebnyi/telecom-ai-monitoring-hackathon/main/docs/view0.png)](https://raw.githubusercontent.com/VsevolodLazebnyi/telecom-ai-monitoring-hackathon/main/docs/docs0.mp4)
+- **Анализ логов с помощью LLM:**
+[![Watch the video](https://raw.githubusercontent.com/VsevolodLazebnyi/telecom-ai-monitoring-hackathon/main/docs/view1.png)](https://raw.githubusercontent.com/VsevolodLazebnyi/telecom-ai-monitoring-hackathon/main/docs/docs1.mp4)
+- **Создание дашбордов с помощью LLM:**
+[![Watch the video](https://raw.githubusercontent.com/VsevolodLazebnyi/telecom-ai-monitoring-hackathon/main/docs/view2.png)](https://raw.githubusercontent.com/VsevolodLazebnyi/telecom-ai-monitoring-hackathon/main/docs/docs2.mp4)
 
 ## 🏛️ Архитектура и компоненты / Architecture & Components
 
