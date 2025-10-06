@@ -37,8 +37,45 @@
 
 - Ниже представлена демонстрация работы анализа логов и создания дашбордов:
 
+  <table>
+    <tr>
+      <td><img src="docs/demo0.gif" alt="Auto collect" width="600" /></td>
+      <td>
+        <b> 📊 Выбор категорий / Category selection</b><br>
+        Гибкая система тегов и ML‑категоризация 
+      </td>
+    </tr>
+  </table>
+  
+  <table align="right">
+    <tr>
+      </td>
+      <td><img src="docs/demo1.gif" alt="Auto collect" width="600" /></td>
+      <td>
+        <b> ✏️ Расскажи о себе / Type about youreself </b><br>
+        Собираем сигналы поведения и используем семантические э
+    </tr>
+  </table>
+  
+  <table>
+    <tr>
+      <td><img src="docs/demo2.gif" alt="Auto collect" width="600" /></td>
+      <td>
+        <b> ⏰ Умная рассылка / Smart scheduling</b><br>
+        Настраиваем cron‑подобные правила
+      </td>
+    </tr>
+  </table>
 
-[![Watch the video](https://raw.githubusercontent.com/VsevolodLazebnyi/telecom-ai-monitoring-hackathon/main/docs/view0.png)](https://drive.google.com/file/d/1RQCVaLSbbzl4DI2u4CnZSYgbNG6iQf_J/view?usp=sharing)
+</div>
+
+- Полное видео:
+
+<div align="center">
+<a href="https://drive.google.com/file/d/1RQCVaLSbbzl4DI2u4CnZSYgbNG6iQf_J/view?usp=sharing" target="_blank">
+<img src="https://raw.githubusercontent.com/VsevolodLazebnyi/telecom-ai-monitoring-hackathon/main/docs/view0.png" alt="Watch the video" width="600">
+</a>
+</div>
 
 ## 🏛️ Архитектура и компоненты / Architecture & Components
 
@@ -70,12 +107,12 @@
 ### Установка и запуск / Setup & Run
 1) Клонируйте репозиторий:
 ```bash
-git clone ...
+git clone telecom-ai-monitoring-hackathon
 ```
 
 2) Перейдите в директорию проекта:
 ```bash
-cd /path/to/...
+cd /path/to/telecom-ai-monitoring-hackathon
 ```
 
 3) Запустите стек мониторинга и симуляции:
