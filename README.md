@@ -19,7 +19,8 @@
 
 ## 🛠️ Технологический стек / Tech Stack
 
-<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 15px;"> <img alt="Python" src="https://img.shields.io/badge/-Python-ffbc03?&logo=Python&style=for-the-badge" /> <a href="https://www.docker.com/"><img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white&style=for-the-badge"></a> <a href="https://prometheus.io/"><img alt="Prometheus" src="https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white&style=for-the-badge"></a> <a href="https://grafana.com/"><img alt="Grafana" src="https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white&style=for-the-badge"></a> <a href="https://redis.io/"><img alt="Redis" src="https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white&style=for-the-badge"></a> <a href="https://www.postgresql.org/"><img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white&style=for-the-badge"></a> <a href="https://www.rabbitmq.com/"><img alt="RabbitMQ" src="https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white&style=for-the-badge"></a> <img alt="AI" src="https://img.shields.io/badge/gpt4free-6A5ACD?style=for-the-badge&logo=openai&logoColor=white"> <img alt="cAdvisor" src="https://img.shields.io/badge/cAdvisor-0A66C2?style=for-the-badge&logo=cadvisor&logoColor=white"> <img alt="Node Exporter" src="https://img.shields.io/badge/node_exporter-4C9A2A?style=for-the-badge&logoColor=white">
+<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 15px;"> <img alt="Python" src="https://img.shields.io/badge/-Python-ffbc03?&logo=Python&style=for-the-badge" /> <a href="https://www.docker.com/"><img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white&style=for-the-badge"></a> <a href="https://prometheus.io/"><img alt="Prometheus" src="https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white&style=for-the-badge"></a> <a href="https://grafana.com/"><img alt="Grafana" src="https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white&style=for-the-badge"></a> <a href="https://redis.io/"><img alt="Redis" src="https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white&style=for-the-badge"></a> <a href="https://www.postgresql.org/"><img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white&style=for-the-badge"></a> <a href="https://www.rabbitmq.com/"><img alt="RabbitMQ" src="https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white&style=for-the-badge"></a> <img alt="AI" src="https://img.shields.io/badge/gpt4free-6A5ACD?style=for-the-badge&logo=openai&logoColor=white"> <img alt="cAdvisor" src="https://img.shields.io/badge/cAdvisor-0A66C2?style=for-the-badge&logo=cadvisor&logoColor=white"> <img alt="Node Exporter" src="https://img.shields.io/badge/node_exporter-4C9A2A?style=for-the-badge&logoColor=white"> <a href="https://www.streamlit.com/"><img alt="Streamlit" src="https://img.shields.io/badge/Streamlit-FF6680?logo=streamlit&logoColor=white&style=for-the-badge"></a>
+
 </div>
 
 - **Инфраструктура:** `Docker`, `docker-compose`
@@ -98,7 +99,7 @@
 ### Установка и запуск / Setup & Run
 1) Клонируйте репозиторий:
 ```bash
-git clone telecom-ai-monitoring-hackathon
+git clone https://github.com/VsevolodLazebnyi/telecom-ai-monitoring-hackathon.git
 ```
 
 2) Перейдите в директорию проекта:
@@ -130,7 +131,7 @@ docker-compose up -d --build
 
 ## 🤖 Использование AI и LLM / AI & LLM Usage
 
-- Включён локальный сервис **gpt4free** (контейнер `g4f`), к которому обращается `...`.
+- Включён локальный сервис **gpt4free** (контейнер `g4f`), к которому обращается `streamlit`.
 - Применения:
   - автоматический поиск метрик,
   - помощь в отладке и расследовании инцидентов,
