@@ -29,6 +29,7 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./generated_dashboards:/app/generated_dashboards
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -82,20 +83,13 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    command: redis-server --requirepass admin123
+    environment:
+      - REDIS_PASSWORD=admin123
+    volumes:
+      - redis_data:/data
     networks:
       - monitoring
-
-  redis-traffic:
-    image: redis:latest
-    container_name: redis-traffic
-    command: 
-      - sh
-      - -c
-      - "while true; do redis-cli -h redis SET foo $$(date +%s) && sleep 0.1; done"
-    networks:
-      - monitoring
-    depends_on:
-      - redis
 
   nginx-1:
     image: nginx:latest
@@ -122,22 +116,22 @@ services:
     container_name: postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: sales_db
+      POSTGRES_DB: telecom_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin
     volumes:
-      - postgres-datasource:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - monitoring
     ports:
-      - "5433:5432"
+      - "5432:5432"
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
     container_name: postgres-exporter
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: "postgresql://postgres:admin@postgres:5432/sales_db?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://postgres:admin@postgres:5432/telecom_db?sslmode=disable"
     ports:
       - "9187:9187"
     depends_on:
@@ -145,6 +139,77 @@ services:
     networks:
       - monitoring
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin123
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - monitoring
+  
+  gpt4free:
+    container_name: gpt4free
+    image: hlohaus789/g4f:latest-slim
+    restart: always
+    ports:
+      - 127.0.0.1:1337:1337
+    volumes:
+      - ./har_and_cookies:/app/har_and_cookies
+      - ./generated_images:/app/generated_images
+    command: >
+      /bin/sh -c "
+      rm -r -f /app/g4f/ &&
+      pip install -U g4f[slim] &&
+      python -m g4f --debug"
+    environment:
+      - OPENAI_EMBEDDING_MODEL=text-embedding-ada-002
+    networks:
+      - monitoring
+
+  telecom-simulator:
+    build: ./simulators
+    container_name: telecom-simulator
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
+      - REDIS_URL=redis://:admin123@redis:6379/0
+    depends_on:
+      - rabbitmq
+      - redis
+    networks:
+      - monitoring
+
+  telecom-monitoring-console:
+    build: .
+    container_name: telecom-monitoring-console
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./generated_dashboards:/app/generated_dashboards
+    environment:
+      - PROMETHEUS_URL=http://prometheus:9090
+      - GRAFANA_URL=http://grafana:3000
+      - GRAFANA_API_KEY=glsa_CR1KUKUEXjXsZsO72sGV0JGbJEm2Aj5y_4e2e5639
+      - REDIS_URL=redis://:admin123@redis:6379/0
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672/
+      - GPT4FREE_URL=http://gpt4free:1337
+    depends_on:
+      - prometheus
+      - grafana
+      - redis
+      - rabbitmq
+      - gpt4free
+    networks:
+      - monitoring
+      
 networks:
   monitoring:
     driver: bridge
@@ -154,4 +219,7 @@ volumes:
   grafana-data: {}
   nginx-data-1: {}
   nginx-data-2: {}
-  postgres-datasource: {}
+  postgres-data: {}
+  redis_data: {}
+  rabbitmq_data: {}
+  gpt4free_data: {}

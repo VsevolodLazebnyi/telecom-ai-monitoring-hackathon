@@ -1,0 +1,32 @@
+groups:
+  - name: telecom_alerts
+    rules:
+      - alert: HighConnectionFailureRate
+        expr: rate(redis_commands_total{command="incr",key="alerts:connection_failure:total"}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: telecom
+        annotations:
+          summary: "High connection failure rate detected"
+          description: "Connection failure rate is {{ $value }} per second"
+
+      - alert: BillingErrorsSpike
+        expr: rate(redis_commands_total{command="incr",key="alerts:billing_error:total"}[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: billing
+        annotations:
+          summary: "Billing errors spike detected"
+          description: "Billing error rate is {{ $value }} per second"
+
+      - alert: TrafficSpikeDetected
+        expr: rate(redis_commands_total{command="incr",key="alerts:traffic_spike:total"}[5m]) > 0.2
+        for: 1m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "Traffic spike detected"
+          description: "Traffic alert rate is {{ $value }} per second"

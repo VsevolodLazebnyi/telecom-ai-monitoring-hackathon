@@ -6,7 +6,7 @@ deleteDatasources:
   - name: "Redis Exporter Prometheus"
 
 datasources:
-  - name: "Prometheus"
+  - name: Prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090

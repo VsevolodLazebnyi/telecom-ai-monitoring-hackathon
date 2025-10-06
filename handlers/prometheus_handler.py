@@ -16,8 +16,6 @@ class PrometheusHandler:
         self.url = url
 
     def fetch_metrics_data(self, ds, vectordbs_handler):
-    
-        """Fetch metrics from specific Prometheus instance"""
         try:
             print("--url", self.url)
             response = requests.get(f"{self.url}/api/v1/label/__name__/values", timeout=10)
@@ -49,7 +47,7 @@ class PrometheusHandler:
                             if (
                                 k in self.ALLOWED_METRIC_LABELS and
                                 not re.match(r'^[a-fA-F0-9]{32,64}$', k) and
-                                not re.match(r'.*\{\{.*\}\}.*', k) and
+                                not re.match(r'.*\\{\\{.*\\}\\}.*', k) and
                                 k not in ['__name__', 'id']
                             )
                         ]
@@ -68,4 +66,3 @@ class PrometheusHandler:
             "labels": labels,
             "datasource": ds_uuid
         }
-    

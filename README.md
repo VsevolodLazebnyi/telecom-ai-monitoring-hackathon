@@ -1,165 +1,167 @@
+<div align="center">
 
+  <img src="docs/banner_mts_hack.png" alt="МТС Engineer Hack - DevOps — проект AI Monitoring" />
 
-## 🚀 Getting Started
+  <h1>AI dashboards and logs monitoring</h1>
+
+  <h3>Автоматизированный мониторинг инфраструктуры и приложений с AI</h3>
+
+  <b>Проект выполнен в рамках хакатона “МТС Engineer Hack — DevOps”</b>
+
+  <br /><br />
+
+  <!-- Badges -->
+  <a href="https://www.docker.com/"><img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white&style=for-the-badge"></a>
+  <a href="https://prometheus.io/"><img alt="Prometheus" src="https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white&style=for-the-badge"></a>
+  <a href="https://grafana.com/"><img alt="Grafana" src="https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white&style=for-the-badge"></a>
+  <img alt="cAdvisor" src="https://img.shields.io/badge/cAdvisor-0A66C2?style=for-the-badge&logo=docker&logoColor=white">
+  <img alt="Node Exporter" src="https://img.shields.io/badge/node_exporter-4C9A2A?style=for-the-badge&logo=linux&logoColor=white">
+  <a href="https://redis.io/"><img alt="Redis" src="https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white&style=for-the-badge"></a>
+  <a href="https://www.postgresql.org/"><img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white&style=for-the-badge"></a>
+  <a href="https://www.rabbitmq.com/"><img alt="RabbitMQ" src="https://img.shields.io/badge/RabbitMQ-FF6600?logo=rabbitmq&logoColor=white&style=for-the-badge"></a>
+  <img alt="AI" src="https://img.shields.io/badge/AI_Analysis-6A5ACD?style=for-the-badge&logo=openai&logoColor=white">
+  <img alt="Telecom" src="https://img.shields.io/badge/Telecom-8A2BE2?style=for-the-badge">
+
+</div>
+
+## 🧑‍💻 О проекте / About the project
+
+- **AI Monitoring** — интеллектуальная система наблюдаемости для инфраструктуры и приложений с AI‑ассистентом. Проект собирает метрики и логи, симулирует телеком‑нагрузку и предоставляет AI‑консоль для анализа, генерации дашбордов и рекомендаций по реагированию на инциденты.
+- *Решаемые проблемы:*  
+  — сложность настройки мониторинга → автоматическая генерация PromQL‑запросов и Grafana‑дашбордов;  
+  — долгое реагирование на инциденты → AI‑анализ алертов и логов с подсказками по устранению.
+
+- **Почему актуально для МТС/телеком:** высокая доступность и наблюдаемость — критичны. Быстрое обнаружение и устранение проблем снижает простои и повышает качество сервиса.
+
+## ✨ Демонстрация / Demo
+
+- Ниже представлена демонстрация работы анализа логов и создания дашбордов:
+
+<img src="docs/demo.mp4
+" alt="Демонстрация работы AI dashboards and logs monitoring" />
+
+## 🏛️ Архитектура и компоненты / Architecture & Components
+
+- **Prometheus** — сбор и хранение метрик (порт `9090`). Конфиг: `./config/prometheus.yml`.
+- **Grafana** — визуализация и дашборды (порт `3000`). Провижининг: `./grafana/provisioning`, загружаемые дашборды: `./generated_dashboards`.
+- **cAdvisor** — метрики контейнеров (порт `8080`).
+- **node-exporter** — системные метрики хоста (порт `9100`).
+- **redis-exporter** — метрики Redis (порт `9121`).
+- **Redis** — кеш/источник метрик симуляторов (порт `6379`, локальный пароль в compose: `admin123`).
+- **PostgreSQL** — база данных приложения (порт `5432`, БД `telecom_db`).
+- **postgres-exporter** — метрики PostgreSQL (порт `9187`).
+- **RabbitMQ** — брокер сообщений для симуляторов (порты `5672`, `15672`).
+- **gpt4free** — локальный AI‑сервис для генерации/анализа (доступен на `127.0.0.1:1337`).
+- **telecom-simulator** — генерация событий/нагрузки; использует RabbitMQ и Redis.
+- **telecom-monitoring-console** — UI интерфейс (порт `8501`), подключается к Prometheus/Grafana и локальному gpt4free.
+
+## 🛠️ Технологический стек / Tech Stack
+
+- **Инфраструктура:** Docker, `docker-compose v3.8`
+- **Мониторинг:** Prometheus, Grafana
+- **AI/LLM:** локальный сервис gpt4free для анализа и генерации дашбордов/рекомендаций
+
+## 🚀 Быстрый старт / Quick Start
+
+### Требования / Requirements
+- Установленные Docker и docker‑compose
+- Ресурсы: минимум 4 GB RAM и 4 CPU
+
+### Установка и запуск / Setup & Run
+1) Клонируйте репозиторий:
+```bash
+git clone ...
+```
+
+2) Перейдите в директорию проекта:
+```bash
+cd /path/to/...
+```
+
+3) Запустите стек мониторинга и симуляции:
+```bash
+docker-compose up -d --build
+```
+
+- Эта команда соберёт образы (там, где указан `build`) и поднимет все сервисы.
+
+### Проверка доступности / Health Check
+- Интерфейс: http://localhost:8501
+- Grafana: http://localhost:3000 (логин/пароль по умолчанию: `admin/admin`)
+- Prometheus: http://localhost:9090
+
+## 📊 Дашборды и эндпоинты / Dashboards & Endpoints
+
+- Grafana: http://localhost:3000 (admin/admin)
+- Prometheus: http://localhost:9090
+- cAdvisor: http://localhost:8080
+- Postgres Exporter: http://localhost:9187
+- Node Exporter: http://localhost:9100
+- Redis Exporter: http://localhost:9121
+- RabbitMQ Management: http://localhost:15672 (admin / `admin123`)
+
+## 🤖 Использование AI и LLM / AI & LLM Usage
+
+- Включён локальный сервис **gpt4free** (контейнер `g4f`), к которому обращается `...`.
+- Применения:
+  - автоматический анализ метрик и алертов,
+  - помощь в отладке и расследовании инцидентов,
+  - генерация PromQL‑запросов и Grafana‑дашбордов,
+  - рекомендации по устранению проблем на основе логов и временных корреляций.
+
+## 🧪 Применение в МТС/Телеком / Telecom Use‑Cases
+
+- Автоматизация развёртывания и мониторинга VNFs/5G‑сервисов.
+- CI/CD‑наблюдаемость для BSS/OSS.
+- Инструментация мобильных бэкенд‑сервисов.
+- Лабораторное тестирование и симуляция нагрузки.
+
+Ожидаемые эффекты:
+- ускорение деплоя,
+- сокращение времени расследования инцидентов,
+- экономия за счёт автоматизации рутинных операций.
+
+## 📂 Структура проекта / Project Structure
+
+```
+Project
+├── Dockerfile
+├── alerts
+│   └── telecom_alerts.yaml
+├── chroma_db
+│   └── chroma.sqlite3
+├── config
+│   └── prometheus.yml
+├── docker-compose.yaml
+├── grafana
+│   └── provisioning
+│       ├── dashboards
+│       │   └── dashboard.yml
+│       └── datasources
+│           └── prometheus.yml
+├── handlers
+│   ├── gpt4free_handler.py
+│   ├── grafana_handler.py
+│   ├── postgres_handler.py
+│   ├── prometheus_handler.py
+│   ├── rabbitmq_handler.py
+│   └── vectordb_handler.py
+├── main.py
+├── requirements.txt
+└── simulators
+    ├── Dockerfile
+    ├── requirements.txt
+    └── telecom_data_simulator.py
+```
+
+## 📑 Лицензия / License
+
+- MIT License. См. файл `LICENSE`.
+
+---
 
 <div align="center">
-  <a href="#-prerequisites">
-    <img src="https://img.shields.io/badge/1.-Prerequisites-4CAF50?style=for-the-badge&logo=check-circle&logoColor=white" alt="Prerequisites">
-  </a>
-  <span>→</span>
-  <a href="#%EF%B8%8F-configuration">
-    <img src="https://img.shields.io/badge/2.-Configuration-2196F3?style=for-the-badge&logo=cog&logoColor=white" alt="Configuration">
-  </a>
-  <span>→</span>
-  <a href="#-deployment">
-    <img src="https://img.shields.io/badge/3.-Deployment-9C27B0?style=for-the-badge&logo=rocket&logoColor=white" alt="Deployment">
-  </a>
-</div>
 
-### 📋 Prerequisites
+⭐ Если проект вам полезен — поддержите звёздой! / If you find it useful, please give it a star! ⭐
 
-<div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 10px 0;">
-  <table>
-    <tr>
-      <td><img src="https://img.icons8.com/color/24/000000/key.png"/></td>
-      <td><strong>Groq API Key</strong></td>
-      <td><a href="https://console.groq.com/">Get it here</a></td>
-    </tr>
-    <tr>
-      <td><img src="https://img.icons8.com/color/24/000000/grafana.png"/></td>
-      <td><strong>Grafana API Key</strong></td>
-      <td>Create with <code>dashboards:write</code> permissions</td>
-    </tr>
-    <tr>
-      <td><img src="https://img.icons8.com/color/24/000000/docker.png"/></td>
-      <td><strong>Docker</strong> (Optional)</td>
-      <td>Recommended for containerized deployment</td>
-    </tr>
-    <tr>
-      <td><img src="https://img.icons8.com/color/24/000000/postgreesql.png"/></td>
-      <td><strong>PostgreSQL</strong></td>
-      <td>Running instance or use provided Docker setup</td>
-    </tr>
-  </table>
-</div>
-
-### ⚙️ Configuration
-
-<div style="background: #f8f9ff; padding: 20px; border-radius: 8px; border-left: 4px solid #2196F3; margin: 15px 0;">
-  <h3>1. Environment Setup</h3>
-  <p>Create a <code>.env</code> file in the root directory with your GROQ API key:</p>
-  
-  ```env
-  GROQ_API_KEY=your_groq_api_key_here
-  ```
-  
-  <div style="background: #e3f2fd; padding: 10px; border-radius: 4px; margin: 10px 0;">
-    <strong>ℹ️ Note:</strong> This is the only configuration needed in the <code>.env</code> file. All other configurations are managed through the Streamlit UI.
-  </div>
-</div>
-
-<div style="background: #f8f9ff; padding: 20px; border-radius: 8px; border-left: 4px solid #4CAF50; margin: 15px 0;">
-  <h3>2. Streamlit UI Configuration</h3>
-  <p>Configure the following settings directly in the Streamlit UI when prompted:</p>
-  
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 15px 0;">
-    <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-      <h4>🔌 Grafana</h4>
-      <ul style="margin: 10px 0 0 0; padding-left: 20px;">
-        <li>URL: <code>http://localhost:3000</code></li>
-        <li>API Key with <code>dashboards:write</code> permissions</li>
-      </ul>
-    </div>
-    
-    <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-      <h4>📊 Prometheus</h4>
-      <ul style="margin: 10px 0 0 0; padding-left: 20px;">
-        <li>URL: <code>http://localhost:9090</code></li>
-      </ul>
-    </div>
-    
-    <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-      <h4>🐘 PostgreSQL</h4>
-      <ul style="margin: 10px 0 0 0; padding-left: 20px;">
-        <li>Connection String: <code>postgresql://postgres:admin@localhost:5433/sales_db</code></li>
-      </ul>
-    </div>
-  </div>
-</div>
-
-**Sample Connection Strings:**
-- Grafana: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
-- PostgreSQL: `postgresql://postgres:admin@localhost:5433/sales_db`
-
-### 🔍 Sample Database
-
-<div style="background: #f0f7ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-  <h2>🔍 Sample Database</h2>
-  
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 15px 0;">
-    <div>
-      <h3>📂 Included Files</h3>
-      <ul>
-        <li>Database schema and metadata in <code>metadata/</code> directory</li>
-        <li>Sample data in CSV format in the root directory</li>
-      </ul>
-    </div>
-    <div>
-      <h3>🔑 Default PostgreSQL Credentials</h3>
-      <table style="width:100%; border-collapse: collapse;">
-        <tr>
-          <td>Database:</td>
-          <td><code>sales_db</code></td>
-        </tr>
-        <tr>
-          <td>User:</td>
-          <td><code>postgres</code></td>
-        </tr>
-        <tr>
-          <td>Password:</td>
-          <td><code>admin</code></td>
-        </tr>
-        <tr>
-          <td>Port:</td>
-          <td><code>5433</code></td>
-        </tr>
-      </table>
-    </div>
-  </div>
-</div>
-
-### 🚀 Deployment
-
-### 🐳 Docker Deployment (Recommended)
-
-<div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 15px 0;">
-  <h3>Prerequisites</h3>
-  <ul>
-    <li>Docker installed on your system</li>
-    <li>Docker Compose installed</li>
-  </ul>
-  
-  <h3>Steps</h3>
-  
-  <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0;">
-    <h4>1. Navigate to project directory</h4>
-    <pre style="background: #2d2d2d; color: #f8f8f2; padding: 10px; border-radius: 4px; overflow-x: auto;">
-    cd /path/to/vizgenie</pre>
-  </div>
-  
-  <div style="background: white; padding: 15px; border-radius: 8px; margin: 10px 0;">
-    <h4>2. Start the containers</h4>
-    <pre style="background: #2d2d2d; color: #f8f8f2; padding: 10px; border-radius: 4px; overflow-x: auto;">
-    docker-compose up -d</pre>
-  </div>
-  
-  <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin: 15px 0 0 0; display: flex; align-items: center;">
-    <div style="margin-right: 15px;">
-      <img src="https://img.icons8.com/color/48/000000/info.png" width="24" height="24"/>
-    </div>
-    <div>
-      <strong>Access the application:</strong> Once the containers are running, open your browser and navigate to <a href="http://localhost:8501">http://localhost:8501</a>
-    </div>
-  </div>
 </div>

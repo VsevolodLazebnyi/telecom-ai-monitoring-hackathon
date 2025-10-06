@@ -1,554 +1,505 @@
-import streamlit as st
+import os
+import json
+import time
+import threading
+from datetime import datetime, timedelta
 
-st.set_page_config(
-    page_title="VizGenie",
-    layout="wide",
-    page_icon="🎩"
-)
-
-from dotenv import load_dotenv
-from handlers.prometheus_handler import PrometheusHandler
-from handlers.postgres_handler import PostgresHandler
-from handlers.grafana_handler import GrafanaHandler
-from handlers.vectordb_handler import VectorDBHandler
-from llm import prompt
 import requests
-import psycopg2
+import pandas as pd
+import streamlit as st
+import redis
+from loguru import logger
 
-# Load environment variables
-load_dotenv()
+from handlers.gpt4free_handler import Gpt4FreeHandler
+from handlers.grafana_handler import GrafanaHandler
+from handlers.prometheus_handler import PrometheusHandler
+from handlers.rabbitmq_handler import RabbitMQHandler
+from handlers.vectordb_handler import VectorDBHandler
 
-# Initialize session state variables if not already set
-if "prometheus_url" not in st.session_state:
-    st.session_state.prometheus_url = ""  # or set a default like "http://localhost:9090"
+APP_TITLE = "Умный мониторинг с ИИ"
+st.set_page_config(page_title=APP_TITLE, page_icon="📡", layout="wide")
 
-if "postgres_url" not in st.session_state:
-    st.session_state.postgres_url = ""
-
-if "grafana_url" not in st.session_state:
-    st.session_state.grafana_url = ""
-
-if "grafana_api_key" not in st.session_state:
-    st.session_state.grafana_api_key = ""
-
-def initialize_session_state():
-    """Initialize Streamlit session state variables"""
-    if 'metrics_labels' not in st.session_state:
-        st.session_state.metrics_labels = {}
-    if 'dummy_loaded' not in st.session_state:
-        st.session_state.dummy_loaded = False
-    
-    # Initialize connection statuses
-    st.session_state.setdefault('grafana_tested', False)
-    st.session_state.setdefault('prometheus_tested', False)
-    st.session_state.setdefault('postgres_tested', False)
-    
-    # Initialize credential fields
-    st.session_state.setdefault('grafana_url', '')
-    st.session_state.setdefault('grafana_api_key', '')
-    st.session_state.setdefault('prometheus_url', '')
-    st.session_state.setdefault('postgres_url', '')
-
-
-# Update your existing CSS with these additions
-st.markdown("""
-    <style>
-    /* Main page background */
-    .stApp {
-        background-color: #f8f9fa;
-    }
-    
-    /* Sidebar navigation */
-    .stSidebar {
-        background-color: #ffffff !important;
-        border-right: 1px solid #e9ecef !important;
-    }
-    
-    /* Text input fields */
-    div[data-baseweb="input"] input,
-    div[data-baseweb="textarea"] textarea {
-        background-color: #ffffff !important;
-        color: #2c3e50 !important;
-        border-color: #dee2e6 !important;
+def get_default_envs():
+    return {
+        "PROMETHEUS_URL": os.getenv("PROMETHEUS_URL", "http://localhost:9090"),
+        "GRAFANA_URL": os.getenv("GRAFANA_URL", "http://localhost:3000"),
+        "GRAFANA_API_KEY": os.getenv("glsa_CR1KUKUEXjXsZsO72sGV0JGbJEm2Aj5y_4e2e5639", "glsa_CR1KUKUEXjXsZsO72sGV0JGbJEm2Aj5y_4e2e5639"),
+        "REDIS_URL": os.getenv("REDIS_URL", "redis://:admin123@localhost:6379/0"),
+        "RABBITMQ_URL": os.getenv("RABBITMQ_URL", "amqp://admin:admin123@localhost:5672/"),
+        "GPT4FREE_URL": os.getenv("GPT4FREE_URL", "http://localhost:1337"),
     }
 
-    /* Dashboard success message styling */
-    div[data-testid="stSuccess"] > div {
-        background-color: #e8f4fc !important;
-        border: 1px solid #c2e0ff !important;
-        color: #2c3e50 !important;
-        border-radius: 8px;
-        padding: 1rem;
-    }
+def init_session_state():
+    if "cfg" not in st.session_state:
+        st.session_state.cfg = get_default_envs()
 
-    /* Dropdown styling */
-    div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        border-color: #dee2e6 !important;
-    }
-    div[data-baseweb="popover"] div {
-        background-color: #ffffff !important;
-        color: #2c3e50 !important;
-    }
-
-    /* Corrected and verified button styling */
-    .stButton button {
-        background-color: #4CAF50 !important;
-        color: white !important;
-        border: 1px solid #45a049 !important;
-        border-radius: 8px !important;
-        padding: 0.5rem 1rem !important;
-        font-weight: 500 !important;
-        transition: all 0.3s ease !important;
-    }
-
-    .stButton button:hover {
-        background-color: #45a049 !important;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
-    }
-
-    .stButton button:active {
-        background-color: #3d8b40 !important;
-        transform: translateY(0) !important;
-    }
-
-    /* Metric management buttons */
-    div[data-testid="stExpander"] div[role="button"] {
-        background-color: #4a90e2 !important;
-        color: white !important;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        margin: 0.5rem 0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        transition: all 0.3s ease;
-    }
-
-    /* Status indicators */
-    .status-box {
-        padding: 1rem;
-        background-color: #ffffff;
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-        margin: 1rem 0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-
-    /* Text elements */
-    h1, h2, h3, h4, h5, h6 {
-        color: #2c3e50 !important;
-    }
-    p, div, span {
-        color: #495057 !important;
-    }
-
-    /* Form styling */
-    .stForm {
-        border: 1px solid #e9ecef !important;
-        border-radius: 8px;
-        padding: 1rem;
-        background-color: #ffffff !important;
-    }
-
-    /* Select box hover state */
-    div[role="listbox"] div:hover {
-        background-color: #f8f9fa !important;
-    }
-    
-    /* Connection status badges */
-    .connection-status {
-        background-color: #f1f3f5 !important;
-        border: 1px solid #dee2e6 !important;
-    }
-    /* Specific styling for query input boxes only */
-    div[data-testid="stForm"] .stTextInput input {
-        background-color: #ffffff !important;
-        border: 2px solid #e0e0e0 !important;
-        border-radius: 8px !important;
-        padding: 0.8rem 1rem !important;
-        font-size: 14px !important;
-        color: #2c3e50 !important;
-        transition: all 0.3s ease !important;
-    }
-
-    div[data-testid="stForm"] .stTextInput input:focus {
-        border-color: #4CAF50 !important;
-        box-shadow: 0 0 0 3px rgba(76,175,80,0.1) !important;
-    }
-
-    div[data-testid="stForm"] .stTextInput input:hover {
-        border-color: #bdbdbd !important;
-    }
-
-    /* Preserve original select box styling */
-    div[data-testid="stForm"] .stSelectbox div[data-baseweb="select"] {
-        background-color: #ffffff !important;
-        border-color: #dee2e6 !important;
-    }
-            
-    /* Dashboard generation button styling */
-    div[data-testid="stForm"] button {
-        background-color: #4CAF50 !important;
-        color: white !important;
-        border: 1px solid #45a049 !important;
-        transition: all 0.3s ease !important;
-        width: 100% !important;
-        padding: 1rem !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-    }
-
-    div[data-testid="stForm"] button:hover {
-        background-color: #45a049 !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
-    }
-
-    div[data-testid="stForm"] button:active {
-        background-color: #3d8b40 !important;
-        transform: translateY(0) !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-
-def test_grafana_connection(url, api_key):
-    """Test Grafana connection"""
-    try:
-        response = requests.get(
-            f"{url}/api/datasources",
-            headers={"Authorization": f"Bearer {api_key}"},
-            timeout=5
+    if "gpt" not in st.session_state:
+        st.session_state.gpt = Gpt4FreeHandler(base_url=st.session_state.cfg["GPT4FREE_URL"])
+    if "grafana" not in st.session_state:
+        st.session_state.grafana = GrafanaHandler(
+            grafana_host=st.session_state.cfg["GRAFANA_URL"],
+            grafana_token=st.session_state.cfg["GRAFANA_API_KEY"],
         )
-        return response.status_code == 200
-    except Exception:
-        return False
+    if "prom" not in st.session_state:
+        st.session_state.prom = PrometheusHandler(url=st.session_state.cfg["PROMETHEUS_URL"])
+    if "vectordb" not in st.session_state:
+        st.session_state.vectordb = VectorDBHandler()
 
-def test_prometheus_connection(url):
-    """Test Prometheus connection"""
     try:
-        response = requests.get(f"{url}/api/v1/status/config", timeout=5)
-        return response.status_code == 200
-    except Exception:
-        return False
+        st.session_state.redis = redis.Redis.from_url(
+            st.session_state.cfg["REDIS_URL"], decode_responses=True
+        )
+    except Exception as e:
+        st.session_state.redis = None
+        logger.error(f"Ошибка инициализации Redis: {e}")
 
-def test_postgres_connection(url):
-    """Test PostgreSQL connection"""
-    try:
-        conn = psycopg2.connect(url)
-        conn.close()
-        return True
-    except Exception:
-        return False
+    if "rabbit_consumer_started" not in st.session_state:
+        st.session_state.rabbit_consumer_started = False
 
-def credential_section():
-    """Display credential input sections with visible cursor and proper status"""
-    st.header("🔐 Connection Settings")
+def sidebar_config():
+    st.sidebar.header("Подключения")
+    cfg = st.session_state.cfg
 
+    cfg["PROMETHEUS_URL"] = st.sidebar.text_input("Prometheus URL", cfg["PROMETHEUS_URL"])
+    cfg["GRAFANA_URL"] = st.sidebar.text_input("Grafana URL", cfg["GRAFANA_URL"])
+    cfg["REDIS_URL"] = st.sidebar.text_input("Redis URL", cfg["REDIS_URL"])
+    cfg["RABBITMQ_URL"] = st.sidebar.text_input("RabbitMQ URL", cfg["RABBITMQ_URL"])
+    cfg["GPT4FREE_URL"] = st.sidebar.text_input("GPT4Free URL", cfg["GPT4FREE_URL"])
 
-    # Grafana Connection
-    with st.expander("📊 **Grafana Configuration**", expanded=True):
-        col1, col2, col3 = st.columns([2, 2, 1])
-        
-        with col1:
-            st.session_state.grafana_url = st.text_input(
-                "Grafana URL",
-                value=st.session_state.grafana_url,
-                placeholder="http://your-grafana-url:3000"
-            )
-        
-        with col2:
-            st.session_state.grafana_api_key = st.text_input(
-                "API Key",
-                type="password",
-                value=st.session_state.grafana_api_key,
-                placeholder="glsa_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-            )
-        
-        with col3:
-            st.markdown("<br>", unsafe_allow_html=True)  # Vertical alignment
-            if st.button("**🔒 Test Connection**", key="test_grafana"):
-                if test_grafana_connection(st.session_state.grafana_url, st.session_state.grafana_api_key):
-                    st.session_state.grafana_tested = True
-                    st.success("Credentials verified!")
-                else:
-                    st.session_state.grafana_tested = False
-                    st.error("Connection failed")
+    col_a, col_b = st.sidebar.columns(2)
+    if col_a.button("Сохранить", use_container_width=True):
+        st.session_state.gpt = Gpt4FreeHandler(base_url=cfg["GPT4FREE_URL"])
+        st.session_state.grafana = GrafanaHandler(grafana_host=cfg["GRAFANA_URL"], grafana_token=cfg["GRAFANA_API_KEY"])
+        st.session_state.prom = PrometheusHandler(url=cfg["PROMETHEUS_URL"])
+        try:
+            st.session_state.redis = redis.Redis.from_url(cfg["REDIS_URL"], decode_responses=True)
+            st.success("Переподключение с обновленной конфигурацией успешно.")
+        except Exception as e:
+            st.error(f"Ошибка переподключения Redis: {e}")
 
-    # Prometheus Connection
-    with st.expander("📈 **Prometheus Configuration**", expanded=True):
-        cols = st.columns([4, 1])
-        with cols[0]:
-            st.session_state.prometheus_url = st.text_input(
-                "Prometheus URL",
-                value=st.session_state.prometheus_url,
-                placeholder="http://your-prometheus-url:9090"
-            )
-        with cols[1]:
-            if st.button("**✅ Test Connection**", key="test_prometheus"):
-                if test_prometheus_connection(st.session_state.prometheus_url):
-                    st.session_state.prometheus_tested = True
-                    st.success("Connection successful!")
-                else:
-                    st.session_state.prometheus_tested = False
-                    st.error("Connection failed")
-
-    # PostgreSQL Connection
-    with st.expander("🗄️ **PostgreSQL Configuration**", expanded=True):
-        cols = st.columns([4, 1])
-        with cols[0]:
-            st.session_state.postgres_url = st.text_input(
-                "PostgreSQL Connection",
-                value=st.session_state.postgres_url,
-                placeholder="postgresql://user:pass@host:port/db"
-            )
-        with cols[1]:
-            if st.button("**✅ Test Connection**", key="test_postgres"):
-                if test_postgres_connection(st.session_state.postgres_url):
-                    st.session_state.postgres_tested = True
-                    st.success("Connection established!")
-                else:
-                    st.session_state.postgres_tested = False
-                    st.error("Connection failed")
-
-    # Status indicators
-    st.divider()
-    status_cols = st.columns(3)
-    status_style = """
-        padding: 12px; 
-        border-radius: 8px; 
-        text-align: center; 
-        margin: 8px 0;
-        font-size: 14px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    """
-    
-    with status_cols[0]:
-        status = "✅ Active" if st.session_state.grafana_tested else "❌ Offline"
-        st.markdown(f"<div style='{status_style} background-color: {'#e8f5e9' if st.session_state.grafana_tested else '#f8d7da'};'><b>Grafana:</b> {status}</div>", unsafe_allow_html=True)
-    
-    with status_cols[1]:
-        status = "✅ Active" if st.session_state.prometheus_tested else "❌ Offline"
-        st.markdown(f"<div style='{status_style} background-color: {'#e8f5e9' if st.session_state.prometheus_tested else '#f8d7da'};'><b>Prometheus:</b> {status}</div>", unsafe_allow_html=True)
-    
-    with status_cols[2]:
-        status = "✅ Active" if st.session_state.postgres_tested else "❌ Offline"
-        st.markdown(f"<div style='{status_style} background-color: {'#e8f5e9' if st.session_state.postgres_tested else '#f8d7da'};'><b>PostgreSQL:</b> {status}</div>", unsafe_allow_html=True)
-
-def display_datasources(datasources):
-    """Display available datasources in formatted way"""
-    st.subheader("🔌 Connected Datasources")
-    cols = st.columns(3)
-    for idx, ds in enumerate(datasources):
-        with cols[idx % 3]:
-            with st.expander(f"{ds['type'].upper()}: {ds['name']}", expanded=False):
-                st.markdown(f"""
-                **UID:** `{ds['uid']}`  
-                **URL:** {ds.get('url', 'N/A')}  
-                **Database:** {ds.get('database', 'N/A')}
-                """)
-
-
-# Update metric management section
-def handle_metric_management(datasources, prometheus_handler, vectordbs_handler):
-    """Metric management section with button styling"""
-    if st.button("🔄 Refresh All Metrics", 
-                key="refresh_metrics",
-                help="Update metrics from all Prometheus datasources"):
-        with st.spinner("Updating metrics across all Prometheus datasources..."):
-            success_count = 0
-            error_count = 0
-            print("here")
-            print(datasources)
-            for ds in [d for d in datasources if str.lower(d['name']) == 'prometheus']:
+    if col_b.button("RabbitMQ", use_container_width=True, disabled=st.session_state.rabbit_consumer_started):
+        try:
+            def start_consumer():
                 try:
-                    count = prometheus_handler.fetch_metrics_data(ds, vectordbs_handler)
-                    if count > 0:
-                        success_count += 1
-                except Exception as e:
-                    error_count += 1
-                    st.error(f"Failed to update {ds['name']}: {str(e)}")
-            
-            if success_count > 0:
-                st.success(f"Successfully updated {success_count} datasources")
-            if error_count > 0:
-                st.error(f"Failed to update {error_count} datasources")
+                    RabbitMQHandler()
+                except Exception as e_:
+                    logger.error(f"Ошибка потока Rabbit consumer: {e_}")
 
+            t = threading.Thread(target=start_consumer, daemon=True)
+            t.start()
+            st.session_state.rabbit_consumer_started = True
+            st.success("RabbitMQ consumer запущен.")
+        except Exception as e:
+            st.error(f"Не удалось запустить consumer: {e}")
 
-# Initialize handlers
-prometheus_handler = PrometheusHandler(st.session_state.prometheus_url)
-postgres_handler = PostgresHandler(st.session_state.postgres_url)
-grafana_handler = GrafanaHandler(st.session_state.grafana_url, st.session_state.grafana_api_key)
-vectordbs_handler = VectorDBHandler()
-def main():
-    """Main application flow"""
-    initialize_session_state()
+def check_prometheus(url: str) -> tuple[bool, str]:
+    try:
+        r = requests.get(f"{url}/api/v1/status/buildinfo", timeout=5)
+        return (r.ok, f"{r.status_code}")
+    except Exception as e:
+        return (False, str(e))
+
+def check_grafana(url: str, key: str) -> tuple[bool, str]:
+    try:
+        headers = {"Authorization": f"Bearer {key}"} if key else {}
+        r = requests.get(f"{url}/api/health", headers=headers, timeout=5)
+        return (r.ok, f"{r.status_code}")
+    except Exception as e:
+        return (False, str(e))
+
+def check_redis(redis_client) -> tuple[bool, str]:
+    try:
+        if not redis_client:
+            return (False, "не инициализирован")
+        pong = redis_client.ping()
+        return (pong is True, "PONG" if pong else "нет ответа")
+    except Exception as e:
+        return (False, str(e))
+
+def check_rabbitmq(amqp_url: str) -> tuple[bool, str]:
+    try:
+        mgmt = "http://localhost:15672/api/overview"
+        r = requests.get(mgmt, auth=("admin", "admin123"), timeout=5)
+        return (r.ok, f"{r.status_code}")
+    except Exception as e:
+        return (False, str(e))
+
+def check_gpt4free(url: str) -> tuple[bool, str]:
+    try:
+        payload = {
+            "model": "gpt-4",
+            "messages": [{"role": "user", "content": "ping"}],
+            "max_tokens": 5,
+            "temperature": 0.0,
+        }
+        r = requests.post(f"{url}/v1/chat/completions", json=payload, timeout=10)
+        return (r.ok, f"{r.status_code}")
+    except Exception as e:
+        return (False, str(e))
+
+def prom_instant_query(base_url: str, query: str):
+    try:
+        r = requests.get(f"{base_url}/api/v1/query", params={"query": query}, timeout=20)
+        return r.ok, (r.json() if r.ok else r.text)
+    except Exception as e:
+        return False, str(e)
+
+def prom_range_query(base_url: str, query: str, start: datetime, end: datetime, step: str = "15s"):
+    try:
+        params = {
+            "query": query,
+            "start": int(start.timestamp()),
+            "end": int(end.timestamp()),
+            "step": step,
+        }
+        r = requests.get(f"{base_url}/api/v1/query_range", params=params, timeout=30)
+        return r.ok, (r.json() if r.ok else r.text)
+    except Exception as e:
+        return False, str(e)
+
+def matrix_to_dataframe(result: list):
+    rows = []
+    for series in result:
+        metric = series.get("metric", {})
+        label = metric.get("instance") or metric.get("pod") or metric.get("__name__") or json.dumps(metric, ensure_ascii=False)
+        for ts, val in series.get("values", []):
+            ts_dt = datetime.fromtimestamp(float(ts))
+            rows.append({"timestamp": ts_dt, "series": label, "value": float(val)})
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows)
+    pivot = df.pivot(index="timestamp", columns="series", values="value").sort_index()
+    return pivot
+
+def vector_to_dataframe(result: list):
+    rows = []
+    for series in result:
+        metric = series.get("metric", {})
+        value = series.get("value")
+        val = float(value[1]) if value and len(value) > 1 else None
+        rows.append({"metric": json.dumps(metric, ensure_ascii=False), "value": val})
+    return pd.DataFrame(rows)
+
+def tab_status():
+    st.markdown("### Статус системы")
+    cfg = st.session_state.cfg
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        ok, info = check_prometheus(cfg["PROMETHEUS_URL"])
+        st.metric("Prometheus", "UP" if ok else "DOWN", delta=info)
+    with col2:
+        ok, info = check_grafana(cfg["GRAFANA_URL"], cfg["GRAFANA_API_KEY"])
+        st.metric("Grafana", "UP" if ok else "DOWN", delta=info)
+    with col3:
+        ok, info = check_redis(st.session_state.redis)
+        st.metric("Redis", "UP" if ok else "DOWN", delta=info)
+
+    col4, col5 = st.columns(2)
+    with col4:
+        ok, info = check_rabbitmq(cfg["RABBITMQ_URL"])
+        st.metric("RabbitMQ", "UP" if ok else "DOWN", delta=info)
+    with col5:
+        ok, info = check_gpt4free(cfg["GPT4FREE_URL"])
+        st.metric("GPT4Free", "UP" if ok else "DOWN", delta=info)
+
+def resolve_grafana_prometheus_uid_and_url():
+    ds_uid = None
+    prom_base_url = st.session_state.cfg["PROMETHEUS_URL"]
+
+    if not st.session_state.cfg["GRAFANA_API_KEY"]:
+        return ds_uid, prom_base_url
+
+    try:
+        datasources = st.session_state.grafana.fetch_datasources()
+        prom_list = [d for d in datasources if d.get("typeName") == "Prometheus" or d.get("name") == "prometheus"]
+        if prom_list:
+            ds = prom_list[0]
+            ds_uid = ds.get("uid")
+        return ds_uid, prom_base_url
+    except Exception as e:
+        st.warning(f"Не удалось получить datasources из Grafana: {e}")
+        return ds_uid, prom_base_url
     
-    st.title("🎩 VizGenie - Natural Language to Dashboard")
-    st.markdown("Transform natural language queries into Grafana dashboards with AI magic!")
+def save_dashboard_to_provisioning(dashboard_json, filename):
+    dashboard_dir = "./generated_dashboards"
+    os.makedirs(dashboard_dir, exist_ok=True)
+    safe_filename = "".join(c for c in filename if c.isalnum() or c in (' ', '-', '_')).rstrip()
+    safe_filename = safe_filename.replace(' ', '_') + ".json"
     
-    # Credential section
-    credential_section()
+    filepath = os.path.join(dashboard_dir, safe_filename)
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(dashboard_json, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"Дашборд сохранен в {filepath}")
+        return filepath
+    except Exception as e:
+        logger.error(f"Ошибка сохранения дашборда: {e}")
+        return None
+
+def tab_metrics_vectordb():
+    st.markdown("### Каталог метрик и VectorDB")
+
+    ds_uid, prom_url = resolve_grafana_prometheus_uid_and_url()
+    if ds_uid:
+        st.success(f"Grafana Prometheus DS UID: {ds_uid}")
+    else:
+        st.info("Grafana API ключ не установлен или Prometheus datasource не найден.")
+
+    ds_uid_input = st.text_input("Datasource UID", ds_uid or "default")
+
+    if st.button("🔄 Синхронизировать метрики → VectorDB"):
+        try:
+            count = st.session_state.prom.fetch_metrics_data(
+                ds={"uid": ds_uid_input},
+                vectordbs_handler=st.session_state.vectordb,
+            )
+            st.success(f"Синхронизировано новых метрик: {count}")
+        except Exception as e:
+            st.error(f"Ошибка синхронизации: {e}")
+
+    st.divider()
+    st.markdown("#### Поиск похожих метрик")
+    examples = st.text_input("Введите названия метрик через запятую")
+    topn = st.slider("Количество результатов", 1, 10, 3)
+    if st.button("🔍 Найти похожие"):
+        names = [x.strip() for x in examples.split(",") if x.strip()]
+        if not names:
+            st.warning("Введите метрики для поиска.")
+        else:
+            sims = st.session_state.vectordb.query_metrics_batch(names, ds_uid=ds_uid_input, n_results=topn)
+            if sims:
+                st.success(f"Похожие метрики ({len(sims)}):")
+                st.write(sims)
+            else:
+                st.info("Ничего не найдено.")
+
+def tab_ai_dashboard():
+    st.markdown("### Генерация дашбордов с ИИ")
     
-    # Check connections with proper session state initialization
-    required_connections = ['grafana_tested', 'prometheus_tested', 'postgres_tested']
-    if not all(st.session_state.get(conn, False) for conn in required_connections):
-        st.markdown("""
-        <div class="status-box">
-            ⚠️ Please configure and test all connections to continue
-        </div>
-        """, unsafe_allow_html=True)
+    if not st.session_state.grafana.test_connection():
+        st.error("❌ Не удалось подключиться к Grafana. Проверьте URL и токен в настройках.")
         return
     
-    print("All connections are valid.")
-    print("Grafana URL:", st.session_state.grafana_url)
-    print("Prometheus URL:", st.session_state.prometheus_url)
-    print("PostgreSQL URL:", st.session_state.postgres_url)
-
-
+    ds_uid, prom_url = resolve_grafana_prometheus_uid_and_url()
+    ds_uid = ds_uid or "default"
     
-    # Load dummy data if not loaded
-    if not st.session_state.dummy_loaded:
-        with st.spinner("Loading initial metrics..."):
-            vectordbs_handler.store_metrics([f"dummy_metric_{i}" for i in range(1, 11)], "sample-datasource-uid")
-            st.session_state.dummy_loaded = True
-
-    # Fetch and display datasources
-    datasources = grafana_handler.fetch_datasources()
-    if not datasources:
-        st.warning("⚠️ No datasources found in Grafana!")
-        st.stop()
+    st.info("💡 Опишите метрики для дашборда")
     
-    display_datasources(datasources)
-    handle_metric_management(datasources, prometheus_handler, vectordbs_handler)
-
-    # Dashboard creation form
-    st.header("🚀 Create New Dashboard")
-    with st.form("main_form"):
-        queries = []
-        for i in range(2):
-            cols = st.columns([4, 1])
-            with cols[0]:
-                query = st.text_input(
-                    f"Query {i+1}", 
-                    placeholder="Describe your visualization in plain English...",
-                    key=f"query_{i}"
-                )
-            with cols[1]:
-                ds_name = st.selectbox(
-                    f"Datasource {i+1}",
-                    options=[ds['name'] for ds in datasources],
-                    key=f"ds_{i}"
-                )
-            queries.append((query, ds_name))
-
-        if st.form_submit_button("✨ Generate Dashboard", use_container_width=True):
-            process_queries(queries, datasources)
-def process_queries(queries, datasources):
-    """Process queries through appropriate handlers"""
-    processed_responses = []
+    col1, col2 = st.columns([2, 1])
     
-    for query_text, ds_name in queries:
-        if not query_text:
-            continue
-            
-        # Find matching datasource
-        datasource = next((ds for ds in datasources if ds['name'] == ds_name), None)
-        if not datasource:
-            st.error(f"🔴 Datasource '{ds_name}' not found!")
-            continue
-
-        try:
-            if datasource['name'] == 'prometheus':
-                response = handle_prometheus_query(query_text, datasource)
-            elif datasource['name'] == 'postgresql':
-                response = handle_postgres_query(query_text, datasource)
-            else:
-                st.warning(f"Unsupported datasource type: {datasource['name']}")
-                continue
-
-            if response and not response.get('error'):
-                processed_responses.append(response)
-                
-        except Exception as e:
-            st.error(f"🔴 Error processing query: {str(e)}")
-            st.exception(e)
-
-    if processed_responses:
-        deploy_dashboard(processed_responses)
-
-def handle_prometheus_query(query_text, datasource):
-    """Process Prometheus query through full pipeline"""
-    with st.spinner(f"🔍 Analyzing Prometheus query: '{query_text}'..."):
-        # Step 1: Get metrics from LLM
-        llm_response = prompt.get_query_metrics_labels([(query_text, datasource['name'])])
-        if llm_response.get('error'):
-            raise Exception("LLM analysis failed")
-        
-        # Step 2: VectorDB similarity search
-        similar_metrics = vectordbs_handler.query_metrics_batch(
-            llm_response['data'][0]['metrics'],
-            datasource['uid'],
-            n_results=5
+    with col1:
+        dashboard_queries = st.text_area(
+            "Запросы для панелей:",
+            height=150,
+            placeholder="Загрузка CPU по контейнерам\nИспользование памяти Redis\nКоличество HTTP запросов\nОшибки подключения к БД"
         )
-
-        # Step 3: Discover labels
-        metric_labels = prometheus_handler.get_metrics_labels(
-            st.session_state.prometheus_url,
-            similar_metrics
-        )
-        # Step 4: Generate PromQL
-        query_context = {
-            "datasource": datasource['uid'],
-            "original_query": query_text,
-            "similar_metrics": similar_metrics,
-            "labels": metric_labels
-        }
-        promql_response = prompt.generate_promql_query([query_context])
-
-        return {
-            'type': 'prometheus',
-            'data': promql_response,
-            'context': query_context
-        }
-
-def handle_postgres_query(query_text, datasource):
-    """Process PostgreSQL query through full pipeline"""
-    with st.spinner(f"🔍 Analyzing PostgreSQL query: '{query_text}'..."):
-        # Get schema context from metadata
-        metadata_context = postgres_handler.load_metadata()
         
-        # Generate SQL with metadata
-        sql_response = prompt.generate_sql_query(
-            query=query_text,
-            datasource=datasource['uid'],
-            metadata_context = metadata_context
-        )
-
-        return {
-            'type': 'postgres',
-            'data': sql_response
-        }
-
-def deploy_dashboard(responses):
-    """Deploy final dashboard to Grafana"""
-    with st.spinner("🎨 Creating beautiful dashboard..."):
-        # Generate Grafana JSON
-        dashboard_json = prompt.generate_grafana_dashboard({
-            "result": [resp['data'] for resp in responses if not resp.get('error')]
-        })
-
+    with col2:
+        dashboard_title = st.text_input("Название дашборда", "AI-dashboard")
+        time_range = st.selectbox("Временной диапазон", ["1h", "6h", "24h", "7d"], index=1)
         
-        if dashboard_json.get('error'):
-            st.error(f"😢 Failed to generate dashboard JSON: {dashboard_json['error']}")
+        folders = st.session_state.grafana.get_folders()
+        folder_options = {0: "AI Generated Dashboards"}
+        for folder in folders:
+            folder_options[folder['id']] = folder['title']
+        
+        selected_folder = st.selectbox("Папка", options=list(folder_options.keys()), 
+                                     format_func=lambda x: folder_options[x])
+
+    if st.button("Сгенерировать дашборд", type="primary"):
+        if not dashboard_queries.strip():
+            st.warning("Введите запросы для панелей")
             return
+            
+        queries = [q.strip() for q in dashboard_queries.split("\n") if q.strip()]
+        if not queries:
+            st.warning("Нет валидных запросов")
+            return
+            
+        st.info(f"Генерация дашборда с {len(queries)} панелями...")
+        
+        panels = []
+        errors = []
+        
+        with st.status("Создание панелей...", expanded=True) as status:
+            for i, query in enumerate(queries):
+                status.write(f"Панель {i+1}: {query}")
+                
+                user_query_map = {
+                    "mandatory_datasource_uuid": ds_uid,
+                    "userquery": query,
+                    "time_range": time_range,
+                    "hints": ["use available metric names", "prefer standard exporters"]
+                }
+                
+                promql_result = st.session_state.gpt.generate_promql_query(user_query_map)
+                
+                if "error" in promql_result:
+                    errors.append(f"❌ '{query}': {promql_result['error']}")
+                    continue
+                    
+                try:
+                    result_arr = promql_result.get("result", [])
+                    if not result_arr:
+                        errors.append(f"❌ '{query}': пустой ответ от ИИ")
+                        continue
+                        
+                    promql = result_arr[0].get("query", "")
+                    if not promql:
+                        errors.append(f"❌ '{query}': не сгенерирован PromQL")
+                        continue
+                        
+                    if any(op in promql.lower() for op in ["rate(", "increase(", "histogram_quantile"]):
+                        panel_type = "timeseries"
+                        format_type = "time_series"
+                    else:
+                        panel_type = "stat"
+                        format_type = "table"
+                    
+                    panel = {
+                        "title": query[:80],
+                        "datasource": {"type": "prometheus", "uid": ds_uid},
+                        "query": promql,
+                        "format": format_type,
+                        "vis_type": panel_type,
+                        "gridPos": {"x": (i % 2) * 12, "y": (i // 2) * 8, "w": 12, "h": 8}
+                    }
+                    panels.append(panel)
+                    status.write(f"✅ Создана панель с PromQL: `{promql[:50]}...`")
+                    
+                except Exception as e:
+                    errors.append(f"❌ '{query}': ошибка обработки - {str(e)}")
+            
+            if errors:
+                status.update(label="Завершено с ошибками", state="error")
+                st.error("Ошибки генерации:")
+                for error in errors:
+                    st.write(error)
+            else:
+                status.update(label="Все панели успешно созданы!", state="complete")
+        
+        if panels:
+            with st.status("Построение дашборда...", expanded=True) as status:
+                status.write("Генерация JSON структуры дашборда...")
+                
+                dashboard_data = {
+                    "dashboard_title": dashboard_title,
+                    "time_range": time_range,
+                    "panels": panels
+                }
+                
+                dash_json = st.session_state.gpt.generate_grafana_dashboard(dashboard_data)
+                
+                if "error" in dash_json:
+                    status.update(label="Ошибка генерации дашборда", state="error")
+                    st.error(f"Ошибка: {dash_json['error']}")
+                    return
+                
+                status.update(label="Дашборд успешно сгенерирован!", state="complete")
+            
+            with st.expander("📋 Просмотр сгенерированного JSON"):
+                st.json(dash_json)
+            
+            st.markdown("---")
+            st.subheader("Импорт в Grafana")
+            
+            col_import1, col_import2 = st.columns([1, 1])
+            
+            with col_import1:
+                if st.button("📁 Сохранить в Grafana", use_container_width=True, 
+                           help="Сохранить дашборд в файл для провижининга Grafana"):
+                    filepath = save_dashboard_to_provisioning(dash_json, dashboard_title)
+                    if filepath:
+                        st.success(f"✅ Сохранено в: `{filepath}`")
+                    else:
+                        st.error("❌ Ошибка сохранения файла дашборда")
+            
+            with col_import2:
+                st.download_button(
+                    label="💾 Скачать JSON",
+                    data=json.dumps(dash_json, indent=2, ensure_ascii=False),
+                    file_name=f"{dashboard_title.lower().replace(' ', '_')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
 
-        # Deploy to Grafana
-        deploy_result = grafana_handler.apply_dashboard(dashboard_json)
-        if deploy_result.get('url'):
-            st.success(f"✅ Dashboard created! [View in Grafana]({deploy_result['url']})")
+def tab_alerts_logs():
+    st.markdown("### ИИ анализ")
+    col_r1, col_r2 = st.columns([1, 1])
+    with col_r1:
+        limit = st.slider("Сколько последних оповещений показать", 10, 200, 50, 10)
+    with col_r2:
+        analyze_ai = st.checkbox("Анализировать оповещения с ИИ", value=False)
+    
+    if st.button("Обновить сейчас"):
+        if hasattr(st, "rerun"):
+            st.rerun()
         else:
-            st.error("😢 Failed to deploy dashboard")
+            st.experimental_rerun()
+            
+    try:
+        r = st.session_state.redis
+        if not r:
+            st.error("Redis не инициализирован.")
+            return
+            
+        cursor = 0
+        keys = []
+        while True:
+            cursor, batch = r.scan(cursor=cursor, match="alert:*", count=500)
+            keys.extend(batch)
+            if cursor == 0:
+                break
+        keys_sorted = sorted(keys, reverse=True)[:limit]
+        if not keys_sorted:
+            st.info("Оповещений пока нет.")
+            return
+            
+        items = []
+        for k in keys_sorted:
+            try:
+                val = r.get(k)
+                if val:
+                    items.append(json.loads(val))
+            except Exception:
+                continue
+                
+        for alert in items:
+            severity = alert.get("severity", "INFO")
+            color = {
+                "CRITICAL": "🟥",
+                "HIGH": "🟧",
+                "WARNING": "🟨",
+                "MEDIUM": "🟨",
+                "INFO": "🟦",
+            }.get(severity, "⬜")
+            st.write(f"{color} [{alert.get('timestamp','')}] {alert.get('type','')}")
+            st.json(alert, expanded=False)
+            if analyze_ai:
+                with st.spinner("Анализ ИИ..."):
+                    explanation = st.session_state.gpt.analyze_alert_with_ai(alert)
+                st.markdown("**Анализ ИИ:**")
+                st.write(explanation)
+    except Exception as e:
+        st.error(f"Ошибка чтения из Redis: {e}")
+
+def main():
+    init_session_state()
+    sidebar_config()
+    st.title(APP_TITLE)
+    tabs = st.tabs([
+        "ИИ → Дашборды",
+        "Оповещения и логи", 
+        "Статус",
+        "Каталог метрик"
+    ])
+    with tabs[0]: tab_ai_dashboard()
+    with tabs[1]: tab_alerts_logs()
+    with tabs[2]: tab_status()
+    with tabs[3]: tab_metrics_vectordb()
+    
 
 if __name__ == "__main__":
     main()
